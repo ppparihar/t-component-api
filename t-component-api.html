@@ -1,0 +1,237 @@
+<link rel="import" href="../polymer/polymer-element.html">
+<link rel="import" href="../iron-ajax/iron-ajax.html">
+
+<dom-module id="t-component-api">
+  <template>
+    <iron-ajax id="ajax" url="[[url]]" handle-as="json" last-response="{{ajaxResponse}}" on-response="_onApiRespone" on-error="_onApiErrorResponse"></iron-ajax>
+  </template>
+
+  <script>
+    class TComponentApi extends Polymer.Element {
+      static get is() {
+        return 't-component-api';
+      }
+
+      static get properties() {
+        return {
+          url: String,
+          request: {
+            type: Object,
+            observer: '_onRequestChanged'
+          },
+          response: {
+            type: Object,
+            notify: true
+          },
+          method: {
+            type: String,
+            value: "POST"
+          },
+          eventPrefix: {
+            type: String,
+            value: ""
+          },
+          autoTrigger: {
+            type: Boolean,
+            value: false
+          },
+          bubbles: {
+            type: Boolean,
+            value: false,
+          },
+
+          ajaxRequestFn: {
+            type: Function,
+            value: null,
+          },
+          responseDataFn: {
+            type: Function,
+            value: null,
+          },
+          errorDataFn: {
+            type: Function,
+            value: null,
+          },
+          validateRequestFn: {
+            type: Function,
+            value: null,
+          },
+          validateResponseFn: {
+            type: Function,
+            value: null
+          }
+        }
+      }
+
+      triggerAjax() {
+        if (!this.validateRequest()) {
+          return;
+        }
+
+        let ajax = this.$.ajax;
+        ajax.body = this.ajaxRequest;
+        ajax.method = this.method;
+        ajax.contentType = "application/json";
+        ajax.generateRequest();
+
+        this._dispatchApiStartEvent();
+      }
+
+      validateRequest() {
+        let invalideState;
+        if (this.validateRequestFn && typeof this.validateRequestFn === 'function') {
+          invalideState = this.validateRequestFn(this.request);
+        } else {
+          invalideState = this._validateRequest;
+        }
+
+        if (invalideState) {
+          this._dispatchApiValidationEvent(invalideState);
+          return false;
+        }
+        return true;
+      }
+
+      get isResponseSucessfull() {
+        if (this.validateResponseFn && typeof this.validateResponseFn === 'function') {
+          return this.validateResponseFn(this.ajaxResponse);
+        }
+        return this._isResponseSucessfull;
+      }
+
+      get ajaxRequest() {
+        if (this.ajaxRequestFn && typeof this.ajaxRequestFn === 'function') {
+          return this.ajaxRequestFn(this.request);
+        }
+        return this._ajaxRequest;
+      }
+
+      get responseData() {
+        if (this.responseDataFn && typeof this.responseDataFn === 'function') {
+          return this.responseDataFn(this.ajaxResponse);
+        }
+        return this._responseData;
+      }
+
+      get errorData() {
+        if (this.errorDataFn && typeof this.errorDataFn === 'function') {
+          return this.errorDataFn(this.ajaxResponse);
+        }
+        return this._errorData;
+      }
+
+
+
+      _onRequestChanged() {
+        if (this.autoTrigger) {
+          this.triggerAjax();
+        }
+
+      }
+
+      _onApiRespone(e) {
+
+        this.response = this.responseData;
+
+        if (this.isResponseSucessfull) {
+          this.dispatchEvent(new CustomEvent(`${this._prefix}success`, {
+            detail: this.response,
+            bubbles: this.bubbles,
+            composed: true
+          }));
+
+        } else {
+          this._dispatchApiErrorEvent(this.errorData);
+        }
+
+        this._dispatchApiCompleteEvent();
+      }
+      _onApiErrorResponse(e) {
+        let error = "An unknown error occurred";
+        if (e.detail) {
+          if (e.detail.request && e.detail.request.xhr && e.detail.request.xhr.response) {
+            error = e.detail.request.xhr.response;
+          } else if (e.detail.error && e.detail.error.message) {
+            error = e.detail.error.message;
+          }
+        }
+        this._dispatchApiErrorEvent(error);
+      }
+
+      _dispatchApiStartEvent() {
+
+        this.dispatchEvent(new CustomEvent(`${this._prefix}start`, {
+          detail: {
+            request: this.request
+          },
+          bubbles: this.bubbles,
+          composed: true
+        }));
+      }
+
+      _dispatchApiCompleteEvent() {
+
+        this.dispatchEvent(new CustomEvent(`${this._prefix}complete`, {
+          detail: {
+            request: this.request,
+            response: this.response
+          },
+          bubbles: this.bubbles,
+          composed: true
+        }));
+      }
+
+      _dispatchApiValidationEvent(invalideState) {
+        this.dispatchEvent(new CustomEvent(`${this._prefix}validate`, {
+          detail: invalideState,
+          bubbles: this.bubbles,
+          composed: true
+        }));
+      }
+
+      _dispatchApiErrorEvent(error) {
+
+        this.dispatchEvent(new CustomEvent(`${this._prefix}error`, {
+          detail: {
+            data: error
+          },
+          bubbles: this.bubbles,
+          composed: true
+        }));
+      }
+
+
+      get _isResponseSucessfull() {
+        return this.ajaxResponse && this.ajaxResponse.status && this.ajaxResponse.status.isSuccessful;
+      }
+
+      get _ajaxRequest() {
+        return this.request;
+      }
+
+      get _responseData() {
+        return this.ajaxResponse;
+      }
+
+      get _errorData() {
+        let error = "Internal error occured";
+        if (this.ajaxResponse && this.ajaxResponse.status && this.ajaxResponse.status.message) {
+          error = this.ajaxResponse.status.message;
+        }
+        return error;
+      }
+
+      get _validateRequest() {
+        let invalideState = null;
+        return invalideState;
+      }
+
+      get _prefix() {
+        return this.eventPrefix ? `${this.eventPrefix}-api-` : 'api-';
+      }
+
+    }
+
+    window.customElements.define(TComponentApi.is, TComponentApi);
+  </script>
+</dom-module>

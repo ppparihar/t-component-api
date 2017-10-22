@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+
+    <title>t-hotel-search-api test</title>
+
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../web-component-tester/browser.js"></script>
+
+    <link rel="import" href="../t-hotel-search-api.html">
+</head>
+
+<body>
+    <test-fixture id="THotelSearchApiFixture">
+        <template>
+            <t-hotel-search-api url="/responds_to_post_with_json"></t-hotel-search-api>
+        </template>
+    </test-fixture>
+    <script>
+        suite('<t-hotel-search-api>', () => {
+            let tHotelSearchApi, server;
+            let responseHeaders = {
+                json: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            let responseData = {
+                success: '{"searchId":"40de3f38-69b1-4431-b2ee-b61fbe317691","status":{"isSuccessful":true,"code":null,"message":null,"info":[]}}',
+                error: '{"status":{"isSuccessful":false,"message":"error message"}}',
+            }
+            let requestObj = {
+                "destination": {
+                    "code": "NYC",
+                    "name": "All Airports - New York",
+                    "cityName": "New York",
+                    "countryCode": "US",
+                    "countryName": "United States",
+                    "geoCode": "40.6437110900879,-73.7900085449219",
+                    "id": 2831,
+                    "stateCode": "NY",
+                    "stateName": "New York",
+                    "type": "Airport",
+                    "additionalInfo": null,
+                    "formattedAddress": "New York, NY, United States - All Airports - New York (NYC)"
+                },
+                "checkIn": "11/15/2017",
+                "checkOut": "11/20/2017",
+                "rooms": [{
+                    "adult": 3,
+                    "children": 0,
+                    "childAges": []
+                }, {
+                    "adult": 2,
+                    "children": 0,
+                    "childAges": []
+                }],
+                "type": "Hotel"
+            }
+            let requestObj_missing_geoCode = {
+                "destination": {
+                    "code": "NYC",
+                    "name": "All Airports - New York",
+                    "cityName": "New York",
+                    "countryCode": "US",
+                    "countryName": "United States",
+                    "id": 2831,
+                    "stateCode": "NY",
+                    "stateName": "New York",
+                    "type": "Airport",
+                    "additionalInfo": null,
+                    "formattedAddress": "New York, NY, United States - All Airports - New York (NYC)"
+                },
+                "checkIn": "11/15/2017",
+                "checkOut": "11/20/2017",
+                "rooms": [{
+                    "adult": 3,
+                    "children": 0,
+                    "childAges": []
+                }, {
+                    "adult": 2,
+                    "children": 0,
+                    "childAges": []
+                }],
+                "type": "Hotel"
+            }
+            let ajaxRequestObj = {
+                "geoCode": {
+                    "lat": 40.6437110900879,
+                    "long": -73.7900085449219
+                },
+                "checkIn": "11/15/2017",
+                "checkOut": "11/20/2017",
+                "rooms": [{
+                    "occupants": [{
+                        "paxType": "Adult",
+                        "count": 3
+                    }]
+                }, {
+                    "occupants": [{
+                        "paxType": "Adult",
+                        "count": 2
+                    }]
+                }]
+            }
+            setup(() => {
+                tHotelSearchApi = fixture('THotelSearchApiFixture');
+                tHotelSearchApi.request = requestObj;
+                server = sinon.fakeServer.create();
+                server.respondWith(
+                    'POST',
+                    '/responds_to_post_with_json', [
+                        200,
+                        responseHeaders.json,
+                        responseData.success
+                    ])
+            })
+            teardown(() => {
+                server.restore();
+            })
+            test('instantiating works', () => {
+                expect(tHotelSearchApi).to.be.ok;
+            })
+            test('trigger Ajax call', () => {
+                tHotelSearchApi.triggerAjax();
+                server.respond();
+                expect(server.requests[0]).to.be.ok;
+                expect(server.requests[0].requestBody).to.be.ok;
+                expect(server.requests[0].requestBody).to.be.equal(JSON.stringify(ajaxRequestObj));
+            })
+            test('trigger hotel-search-api-validate event on invalid request',()=>{
+                var validationHandler = sinon.spy();
+                tHotelSearchApi.request = requestObj_missing_geoCode;
+                tHotelSearchApi.addEventListener('hotel-search-api-validate', validationHandler);
+                tHotelSearchApi.triggerAjax();
+                server.respond();
+
+                expect(validationHandler.called).to.be.true; 
+                expect(server.requests[0]).to.not.be.ok;              
+               
+            })
+        })
+    </script>
+</body>

@@ -1,0 +1,70 @@
+<link rel="import" href="../polymer/polymer-element.html">
+<link rel="import" href="./t-component-api.html">
+
+<dom-module id="t-hotel-search-api">
+
+    <script>
+        class THotelSearchApi extends TComponentApi {
+            static get is() {
+                return 't-hotel-search-api';
+            }
+            constructor() {
+                super();
+            }
+
+            static get properties() {
+                return {
+                    eventPrefix: {
+                        type: String,
+                        value: "hotel-search"
+                    }
+                }
+            }
+
+            get _ajaxRequest() {
+
+                let geoCodes = this.request.destination.geoCode.split(",");
+                let model = {
+                    "geoCode": {
+                        "lat": parseFloat(geoCodes[0]),
+                        "long": parseFloat(geoCodes[1])
+                    },
+                    "checkIn": this.request.checkIn,
+                    "checkOut": this.request.checkOut,
+                    "rooms": []
+                }
+
+                this.request.rooms.forEach(function (r) {
+                    let occupants = [];
+                    occupants.push({
+                        "paxType": "Adult",
+                        "count": r.adult
+                    });
+                    if (r.children && r.children > 0) {
+                        occupants.push({
+                            "paxType": "Child",
+                            "count": r.children,
+                            "ages": r.childAges
+                        });
+                    }
+                    model.rooms.push({
+                        "occupants": occupants
+                    });
+                });
+
+                return model;
+            }
+
+            get _validateRequest() {
+                let invalideState = null;
+                if (!(this.request && this.request.destination && this.request.destination.geoCode && this.request.rooms.length > 0)) {
+                    invalideState = "The the request is not valide";
+                }
+                return invalideState;
+            }
+
+        }
+
+        window.customElements.define(THotelSearchApi.is, THotelSearchApi);
+    </script>
+</dom-module>

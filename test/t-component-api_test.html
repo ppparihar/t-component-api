@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+
+  <title>t-component-api test</title>
+
+  <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+  <script src="../../web-component-tester/browser.js"></script>
+
+  <link rel="import" href="../t-component-api.html">
+</head>
+
+<body>
+
+  <test-fixture id="TCompApiFixture">
+    <template>
+      <t-component-api url="/responds_to_post_with_json"></t-component-api>
+    </template>
+  </test-fixture>
+  <test-fixture id="TCompApiGetFixture">
+    <template>
+      <t-component-api url="/responds_to_get_with_json" method="GET"></t-component-api>
+    </template>
+  </test-fixture>
+  <test-fixture id="AutotriggerFixture">
+    <template>
+      <t-component-api url="/responds_to_post_with_json" auto-trigger></t-component-api>
+    </template>
+  </test-fixture>
+  <test-fixture id="EventPrefixFixture">
+    <template>
+      <t-component-api url="/responds_to_post_with_json" event-prefix="my-prefix"></t-component-api>
+    </template>
+  </test-fixture>
+
+
+  <script>
+    suite('<t-component-api>', () => {
+      let server;
+      let tCompApi;
+      let responseHeaders = {
+        json: {
+          'Content-Type': 'application/json'
+        }
+      };
+      let responseData = {
+        success: '{"status":{"isSuccessful":true},"data":"test data"}',
+        error: '{"status":{"isSuccessful":false,"message":"error message"}}',
+        error504: '{"message": "Endpoint request timed out"}'
+      }
+      let requestObj = {
+        "data": "test Data"
+      };
+      setup(() => {
+        server = sinon.fakeServer.create();
+        server.respondWith(
+          'POST',
+          '/responds_to_post_with_json', [
+            200,
+            responseHeaders.json,
+            responseData.success
+          ]
+        );
+        server.respondWith(
+          'POST',
+          '/responds_to_post_error_with_json', [
+            200,
+            responseHeaders.json,
+            responseData.error
+          ]
+        );
+        server.respondWith(
+          'POST',
+          '/responds_to_post_with_504_error_json', [
+            504,
+            responseHeaders.json,
+            responseData.error504
+          ]
+        );
+        server.respondWith(
+          'POST',
+          '/responds_to_post_with_404_error_json', [
+            404,
+            responseHeaders.json,
+            ''
+          ]
+        );
+        server.respondWith(
+          'GET',
+          '/responds_to_get_with_json', [
+            200,
+            responseHeaders.json,
+            responseData.success
+          ]
+        );
+
+        tCompApi = fixture('TCompApiFixture');
+        tCompApi.request = requestObj;
+      });
+
+      teardown(() => {
+        server.restore();
+      });
+
+      test('instantiating the element works', () => {
+     
+        expect(tCompApi).to.be.ok;
+      });
+
+      test('trigger Ajax works', () => {
+       
+        tCompApi.triggerAjax();
+        server.respond();
+        expect(server.requests[0]).to.be.ok;
+        expect(server.requests[0].requestBody).to.be.equal(
+          JSON.stringify(requestObj));
+      })
+
+      test('auto trigger works', () => {
+        tCompApi = fixture('AutotriggerFixture');
+        tCompApi.request = requestObj;
+        server.respond();
+        expect(server.requests[0]).to.be.ok;
+        expect(server.requests[0].requestBody).to.be.equal(
+          JSON.stringify(requestObj));
+      })
+
+      test('trigger Ajax with get method works', (done) => {
+        tCompApi = fixture('TCompApiGetFixture');
+        tCompApi.triggerAjax();
+        server.respond();
+
+        flush(() => {
+          expect(server.requests[0]).to.be.ok;
+          expect(tCompApi.ajaxResponse).to.be.ok;
+          expect(JSON.stringify(tCompApi.ajaxResponse)).to.be.equal(
+            responseData.success);
+          done();
+        })
+      })
+
+      suite('when life cycle event handlers are bound', () => {
+        let startHandler, sucessHandler, errorHandler, completeHandler;
+        setup(() => {
+          startHandler = sinon.spy();
+          sucessHandler = sinon.spy();
+          errorHandler = sinon.spy();
+          completeHandler = sinon.spy();
+
+          tCompApi.addEventListener('api-start', startHandler);
+          tCompApi.addEventListener('api-success', sucessHandler);
+          tCompApi.addEventListener('api-complete', completeHandler);
+          tCompApi.addEventListener('api-error', errorHandler);
+        });
+
+        test('start, success and complete event handlers called in case of sucessfull response', (done) => {
+
+          tCompApi.triggerAjax();
+          server.respond();
+          expect(server.requests[0]).to.be.ok;
+          flush(() => {
+
+            expect(startHandler.called).to.be.true;
+            expect(sucessHandler.called).to.be.true;
+            expect(completeHandler.called).to.be.true;
+            done();
+          })
+
+        })
+
+        test('start, error and complete event handlers called in case of failure response', (done) => {
+
+          tCompApi.url = "/responds_to_post_error_with_json";
+          tCompApi.triggerAjax();
+          server.respond();
+          expect(server.requests[0]).to.be.ok;
+          flush(() => {
+            expect(startHandler.called).to.be.true;
+            expect(errorHandler.called).to.be.true;
+            expect(completeHandler.called).to.be.true;
+            done();
+          })
+
+        })
+
+      });
+
+      suite('when override methods', () => {
+
+        test('ajaxRequestFn is called correctly', () => {
+
+          let modifiedData = "modified data";
+          let modifiedRequest = {
+            "data": modifiedData
+          };
+          let ajaxRequestFn = sinon.spy((request) => {
+            request.data = modifiedData;
+            return request;
+          })
+          tCompApi.ajaxRequestFn = ajaxRequestFn
+
+          tCompApi.triggerAjax();
+          server.respond();
+
+          expect(server.requests[0]).to.be.ok;
+          expect(ajaxRequestFn.called).to.be.true;
+          expect(server.requests[0].requestBody).to.be.equal(
+            JSON.stringify(modifiedRequest));
+        })
+
+        test('responseDataFn is called correctly', (done) => {
+
+          let modifiedData = "modified data";
+          let modifiedResponse = {
+            "status": {
+              "isSuccessful": true
+            },
+            "data": "modified data"
+          };
+
+          let responseDataFn = sinon.spy((response) => {
+            response.data = modifiedData;
+            return response;
+          });
+          tCompApi.responseDataFn = responseDataFn;
+          tCompApi.triggerAjax();
+          server.respond();
+          flush(() => {
+            expect(responseDataFn.called).to.be.true;
+            expect(tCompApi.response).to.be.ok;
+            expect(JSON.stringify(tCompApi.response)).to.be.equal(
+              JSON.stringify(modifiedResponse));
+            done();
+          });
+        });
+        test('errorDataFn is called correctly', (done) => {
+
+          let modifiedData = "modified data";
+          let modifiedResponse = {
+            "isSuccessful": false,
+            "message": "modified error message"
+          }
+
+          let errorDataFn = sinon.spy((response) => {
+            response.status.message = "modified error message";
+            return response.status;
+          });
+
+          tCompApi.errorDataFn = errorDataFn
+          tCompApi.url = "/responds_to_post_error_with_json";
+
+          tCompApi.addEventListener('api-error', (e) => {
+            expect(errorDataFn.called).to.be.true;
+            expect(e.detail).to.be.ok;
+            expect(JSON.stringify(e.detail.data)).to.be.equal(
+              JSON.stringify(modifiedResponse));
+            done();
+          });
+
+          tCompApi.triggerAjax();
+          server.respond();
+
+        })
+        test('validateRequestFn is called correctly', (done) => {
+
+          let validateRequestFn = sinon.spy(function (request) {
+            let invalideState = "invalide data";
+            return invalideState;
+
+          })
+          tCompApi.validateRequestFn = validateRequestFn;
+          tCompApi.addEventListener('api-validate', (e) => {
+            expect(validateRequestFn.called).to.be.true;
+            expect(e.detail).to.be.ok;
+            expect(e.detail).to.be.equal("invalide data");
+            done();
+          });
+
+          tCompApi.triggerAjax();
+          server.respond();
+
+        })
+
+        test('validateResponseFn is called correctly', (done) => {
+
+          let modifiedData = "modified data";
+          let modifiedRequest = {
+            "data": modifiedData
+          };
+          let validateResponseFn = sinon.spy(function (arg) {
+            return true;
+          });
+
+          tCompApi.validateResponseFn = validateResponseFn;
+
+          tCompApi.triggerAjax();
+          server.respond();
+
+          flush(() => {
+            expect(validateResponseFn.called).to.be.true;
+            expect(validateResponseFn.alwaysCalledWith(JSON.parse(responseData.success))).to.be.true;
+            done();
+          });
+
+
+        })
+      })
+
+      suite('when setting custom event prefix', () => {
+        let startHandler, sucessHandler, errorHandler, completeHandler;
+
+        setup(() => {
+          startHandler = sinon.spy();
+          sucessHandler = sinon.spy();
+          errorHandler = sinon.spy();
+          completeHandler = sinon.spy();
+
+          tCompApi = fixture('EventPrefixFixture');
+
+          tCompApi.addEventListener('my-prefix-api-start', startHandler);
+          tCompApi.addEventListener('my-prefix-api-success', sucessHandler);
+          tCompApi.addEventListener('my-prefix-api-complete', completeHandler);
+          tCompApi.addEventListener('my-prefix-api-error', errorHandler);
+        });
+
+        test('sucess event fired with the custom event prefix', (done) => {
+
+          tCompApi.triggerAjax();
+          server.respond();
+          expect(server.requests[0]).to.be.ok;
+
+          flush(() => {
+            expect(startHandler.called).to.be.true;
+            expect(sucessHandler.called).to.be.true;
+            expect(completeHandler.called).to.be.true;
+            done();
+          })
+
+        })
+
+        test('error event fired with the custom event prefix', (done) => {
+          tCompApi.url = "/responds_to_post_error_with_json";
+          tCompApi.triggerAjax();
+          server.respond();
+          expect(server.requests[0]).to.be.ok;
+
+          flush(() => {
+            expect(startHandler.called).to.be.true;
+            expect(errorHandler.called).to.be.true;
+            expect(completeHandler.called).to.be.true;
+            done();
+          })
+
+        })
+      })
+
+      suite('when error occure with AJAX call', () => {       
+        test('picking error from response works', (done) => {
+          tCompApi.url = '/responds_to_post_with_504_error_json';
+          tCompApi.addEventListener('api-error', errorHandler);
+          tCompApi.triggerAjax();
+          server.respond();
+
+          function errorHandler(e){
+            expect(e.detail.data).to.be.ok;
+            expect(e.detail.data).to.deep.equal(JSON.parse(responseData.error504));
+            done();
+          }
+          
+        })
+        test('picking error from errorMessage works', (done) => {
+          tCompApi.url = '/responds_to_post_with_404_error_json';
+          tCompApi.addEventListener('api-error', errorHandler);
+          tCompApi.triggerAjax();
+          server.respond();
+
+          function errorHandler(e){
+            expect(e.detail.data).to.be.ok;
+            expect(e.detail.data).to.be.equal("The request failed with status code: 404");
+            done();
+          }
+          
+        })
+      })
+
+    });
+  </script>
+
+</body>
+
+</html>
