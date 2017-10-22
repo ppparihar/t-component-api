@@ -1,0 +1,26 @@
+{
+  "name": "t-component-api",
+  "version": "1.0.0",
+  "description": "First, make sure you have the [Polymer CLI](https://www.npmjs.com/package/polymer-cli) installed. Then run `polymer serve` to serve your element locally.",
+  "main": "wct.conf.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "polymer test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ppparihar/t-component-api.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ppparihar/t-component-api/issues"
+  },
+  "homepage": "https://github.com/ppparihar/t-component-api#readme",
+  "devDependencies": {
+    "coveralls": "^3.0.0",
+    "lcov-result-merger": "^1.2.0"
+  }
+}
