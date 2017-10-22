@@ -54,8 +54,8 @@
                     "childAges": []
                 }, {
                     "adult": 2,
-                    "children": 0,
-                    "childAges": []
+                    "children": 2,
+                    "childAges": [2, 6]
                 }],
                 "type": "Hotel"
             }
@@ -102,6 +102,10 @@
                     "occupants": [{
                         "paxType": "Adult",
                         "count": 2
+                    }, {
+                        "paxType": "Child",
+                        "count": 2,
+                        "ages": [2, 6]
                     }]
                 }]
             }
@@ -130,16 +134,16 @@
                 expect(server.requests[0].requestBody).to.be.ok;
                 expect(server.requests[0].requestBody).to.be.equal(JSON.stringify(ajaxRequestObj));
             })
-            test('trigger hotel-search-api-validate event on invalid request',()=>{
+            test('trigger hotel-search-api-validate event on invalid request', () => {
                 var validationHandler = sinon.spy();
                 tHotelSearchApi.request = requestObj_missing_geoCode;
                 tHotelSearchApi.addEventListener('hotel-search-api-validate', validationHandler);
                 tHotelSearchApi.triggerAjax();
                 server.respond();
 
-                expect(validationHandler.called).to.be.true; 
-                expect(server.requests[0]).to.not.be.ok;              
-               
+                expect(validationHandler.called).to.be.true;
+                expect(server.requests[0]).to.not.be.ok;
+
             })
         })
     </script>
